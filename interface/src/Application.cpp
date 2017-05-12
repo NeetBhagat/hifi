@@ -3160,6 +3160,11 @@ void Application::mouseMoveEvent(QMouseEvent* event) {
 }
 
 void Application::mousePressEvent(QMouseEvent* event) {
+	//Do not allow mouse press event anywhere on screen in HMD/VR mode
+	//Allow only in Desktop mode
+	if (isHMDMode()){
+		return;
+	}
     // Inhibit the menu if the user is using alt-mouse dragging
     _altPressed = false;
 
