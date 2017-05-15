@@ -792,11 +792,9 @@ function mouseClickEvent(event) {
         result = findClickedEntity(event);
         tabletClicked = wasTabletClicked(event);
         if (tabletClicked) {
-            print("tabletClicked:: return");
             return;
         }
         
-        print("tabletClicked No");
         if (result === null || result === undefined) {
             if (!event.isShifted) {
                 selectionManager.clearSelections();

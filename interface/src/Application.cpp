@@ -3213,6 +3213,11 @@ void Application::mousePressEvent(QMouseEvent* event) {
 }
 
 void Application::mouseDoublePressEvent(QMouseEvent* event) {
+	//Do not allow mouse press event anywhere on screen in HMD/VR mode
+	//Allow only in Desktop mode
+	if (isHMDMode()){
+		return;
+	}
     auto offscreenUi = DependencyManager::get<OffscreenUi>();
     auto eventPosition = getApplicationCompositor().getMouseEventPosition(event);
     QPointF transformedPos = offscreenUi->mapToVirtualScreen(eventPosition, _glWidget);
