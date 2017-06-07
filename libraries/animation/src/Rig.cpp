@@ -954,7 +954,7 @@ void Rig::updateAnimations(float deltaTime, const glm::mat4& rootTransform, cons
         updateAnimationStateHandlers();
         _animVars.setRigToGeometryTransform(_rigToGeometryTransform);
 
-        AnimContext context(_enableDebugDrawIKTargets, _enableDebugDrawIKConstraints,
+        AnimContext context(_enableDebugDrawIKTargets, _enableDebugDrawIKConstraints, _enableDebugDrawIKChains,
                             getGeometryToRigTransform(), rigToWorldTransform);
 
         // evaluate the animation
@@ -1047,6 +1047,22 @@ void Rig::updateFromHeadParameters(const HeadParameters& params, float dt) {
     } else {
         _animVars.set("spine2Type", (int)IKTarget::Type::Unknown);
     }
+
+    if (params.leftArmEnabled) {
+        _animVars.set("leftArmType", (int)IKTarget::Type::RotationAndPosition);
+        _animVars.set("leftArmPosition", params.leftArmPosition);
+        _animVars.set("leftArmRotation", params.leftArmRotation);        
+    } else {
+        _animVars.set("leftArmType", (int)IKTarget::Type::Unknown);
+    }
+
+    if (params.rightArmEnabled) {
+        _animVars.set("rightArmType", (int)IKTarget::Type::RotationAndPosition);
+        _animVars.set("rightArmPosition", params.rightArmPosition);
+        _animVars.set("rightArmRotation", params.rightArmRotation);
+    } else {
+        _animVars.set("rightArmType", (int)IKTarget::Type::Unknown);
+    }
 }
 
 void Rig::updateFromEyeParameters(const EyeParameters& params) {
@@ -1088,10 +1104,12 @@ void Rig::updateHeadAnimVars(const HeadParameters& params) {
                 // Since there is an explicit hips ik target, switch the head to use the more generic RotationAndPosition IK chain type.
                 // this will allow the spine to bend more, ensuring that it can reach the head target position.
                 _animVars.set("headType", (int)IKTarget::Type::RotationAndPosition);
+                _animVars.unset("headWeight");  // use the default weight for this target.
             } else {
                 // When there is no hips IK target, use the HmdHead IK chain type.  This will make the spine very stiff,
                 // but because the IK _hipsOffset is enabled, the hips will naturally follow underneath the head.
                 _animVars.set("headType", (int)IKTarget::Type::HmdHead);
+                _animVars.set("headWeight", 8.0f);
             }
         } else {
             _animVars.unset("headPosition");
@@ -1117,9 +1135,9 @@ void Rig::updateEyeJoint(int index, const glm::vec3& modelTranslation, const glm
         }
 
         glm::vec3 headUp = headQuat * Vectors::UNIT_Y;
-        glm::vec3 z, y, x;
-        generateBasisVectors(lookAtVector, headUp, z, y, x);
-        glm::mat3 m(glm::cross(y, z), y, z);
+        glm::vec3 z, y, zCrossY;
+        generateBasisVectors(lookAtVector, headUp, z, y, zCrossY);
+        glm::mat3 m(-zCrossY, y, z);
         glm::quat desiredQuat = glm::normalize(glm::quat_cast(m));
 
         glm::quat deltaQuat = desiredQuat * glm::inverse(headQuat);
@@ -1400,22 +1418,23 @@ void Rig::computeAvatarBoundingCapsule(
 
     AnimInverseKinematics ikNode("boundingShape");
     ikNode.setSkeleton(_animSkeleton);
+
     ikNode.setTargetVars("LeftHand",
                          "leftHandPosition",
                          "leftHandRotation",
-                         "leftHandType");
+                         "leftHandType", "leftHandWeight", 1.0f, {});
     ikNode.setTargetVars("RightHand",
                          "rightHandPosition",
                          "rightHandRotation",
-                         "rightHandType");
+                         "rightHandType", "rightHandWeight", 1.0f, {});
     ikNode.setTargetVars("LeftFoot",
                          "leftFootPosition",
                          "leftFootRotation",
-                         "leftFootType");
+                         "leftFootType", "leftFootWeight", 1.0f, {});
     ikNode.setTargetVars("RightFoot",
                          "rightFootPosition",
                          "rightFootRotation",
-                         "rightFootType");
+                         "rightFootType", "rightFootWeight", 1.0f, {});
 
     AnimPose geometryToRig = _modelOffset * _geometryOffset;
 
@@ -1448,7 +1467,7 @@ void Rig::computeAvatarBoundingCapsule(
 
     // call overlay twice: once to verify AnimPoseVec joints and again to do the IK
     AnimNode::Triggers triggersOut;
-    AnimContext context(false, false, glm::mat4(), glm::mat4());
+    AnimContext context(false, false, false, glm::mat4(), glm::mat4());
     float dt = 1.0f; // the value of this does not matter
     ikNode.overlay(animVars, context, dt, triggersOut, _animSkeleton->getRelativeBindPoses());
     AnimPoseVec finalPoses =  ikNode.overlay(animVars, context, dt, triggersOut, _animSkeleton->getRelativeBindPoses());

@@ -45,7 +45,7 @@
 #include <AudioReverb.h>
 #include <AudioLimiter.h>
 #include <AudioConstants.h>
-#include <AudioNoiseGate.h>
+#include <AudioGate.h>
 
 #include <shared/RateCounter.h>
 
@@ -94,7 +94,6 @@ public:
             _audio(audio), _unfulfilledReads(0) {}
 
         void start() { open(QIODevice::ReadOnly | QIODevice::Unbuffered); }
-        void stop() { close(); }
         qint64 readData(char * data, qint64 maxSize) override;
         qint64 writeData(const char * data, qint64 maxSize) override { return 0; }
         int getRecentUnfulfilledReads() { int unfulfilledReads = _unfulfilledReads; _unfulfilledReads = 0; return unfulfilledReads; }
@@ -109,7 +108,7 @@ public:
     void selectAudioFormat(const QString& selectedCodecName);
 
     Q_INVOKABLE QString getSelectedAudioFormat() const { return _selectedCodecName; }
-    Q_INVOKABLE bool getNoiseGateOpen() const { return _noiseGate.isOpen(); }
+    Q_INVOKABLE bool getNoiseGateOpen() const { return _audioGateOpen; }
     Q_INVOKABLE float getSilentInboundPPS() const { return _silentInbound.rate(); }
     Q_INVOKABLE float getAudioInboundPPS() const { return _audioInbound.rate(); }
     Q_INVOKABLE float getSilentOutboundPPS() const { return _silentOutbound.rate(); }
@@ -118,7 +117,7 @@ public:
     const MixedProcessedAudioStream& getReceivedAudioStream() const { return _receivedAudioStream; }
     MixedProcessedAudioStream& getReceivedAudioStream() { return _receivedAudioStream; }
 
-    float getLastInputLoudness() const { return glm::max(_lastInputLoudness - _noiseGate.getMeasuredFloor(), 0.0f); }
+    float getLastInputLoudness() const { return _lastInputLoudness; }   // TODO: relative to noise floor?
 
     float getTimeSinceLastClip() const { return _timeSinceLastClip; }
     float getAudioAverageInputLoudness() const { return _lastInputLoudness; }
@@ -360,7 +359,8 @@ private:
 
     AudioIOStats _stats;
 
-    AudioNoiseGate _noiseGate;
+    AudioGate* _audioGate { nullptr };
+    bool _audioGateOpen { false };
 
     AudioPositionGetter _positionGetter;
     AudioOrientationGetter _orientationGetter;

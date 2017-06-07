@@ -21,6 +21,11 @@ var blastShareText = "Blast to my Connections",
     hifiAlreadySharedText = "Already Shared to Snaps Feed",
     facebookShareText = "Share to Facebook",
     twitterShareText = "Share to Twitter";
+
+function fileExtensionMatches(filePath, extension) {
+    return filePath.split('.').pop().toLowerCase() === extension;
+}
+
 function showSetupInstructions() {
     var snapshotImagesDiv = document.getElementById("snapshot-images");
     snapshotImagesDiv.className = "snapshotInstructions";
@@ -44,6 +49,7 @@ function showSetupComplete() {
             '<p>Snapshot location set.</p>' +
             '<p>Press the big red button to take a snap!</p>' +
         '</div>';
+    document.getElementById("snap-button").disabled = false;
 }
 function showSnapshotInstructions() {
     var snapshotImagesDiv = document.getElementById("snapshot-images");
@@ -69,7 +75,6 @@ function login() {
     }));
 }
 function clearImages() {
-    document.getElementById("snap-button").disabled = false;
     var snapshotImagesDiv = document.getElementById("snapshot-images");
     snapshotImagesDiv.classList.remove("snapshotInstructions");
     while (snapshotImagesDiv.hasChildNodes()) {
@@ -276,10 +281,10 @@ function addImage(image_data, isLoggedIn, canShare, isGifLoading, isShowingPrevi
     if (!image_data.localPath) {
         return;
     }
-    var id = "p" + (idCounter++),
-        imageContainer = document.createElement("DIV"),
+    var imageContainer = document.createElement("DIV"),
         img = document.createElement("IMG"),
-        isGif;
+        isGif = fileExtensionMatches(image_data.localPath, "gif"),
+        id = "p" + (isGif ? "1" : "0");
     imageContainer.id = id;
     imageContainer.style.width = "95%";
     imageContainer.style.height = "240px";
@@ -290,22 +295,27 @@ function addImage(image_data, isLoggedIn, canShare, isGifLoading, isShowingPrevi
     imageContainer.style.position = "relative";
     img.id = id + "img";
     img.src = image_data.localPath;
-    isGif = img.src.split('.').pop().toLowerCase() === "gif";
     imageContainer.appendChild(img);
     document.getElementById("snapshot-images").appendChild(imageContainer);
     paths.push(image_data.localPath);
-    if (isGif) {
-        imageContainer.innerHTML += '<span class="gifLabel">GIF</span>';
-    }
-    if (!isGifLoading) {
-        appendShareBar(id, isLoggedIn, canShare, isGif, blastButtonDisabled, hifiButtonDisabled, canBlast);
-    }
-    if (!isGifLoading && !isShowingPreviousImages) {
-        shareForUrl(id);
-    }
-    if (isShowingPreviousImages && isLoggedIn && image_data.story_id) {
-        updateShareInfo(id, image_data.story_id);
-    }
+    img.onload = function () {
+        if (isGif) {
+            imageContainer.innerHTML += '<span class="gifLabel">GIF</span>';
+        }
+        if (!isGifLoading) {
+            appendShareBar(id, isLoggedIn, canShare, isGif, blastButtonDisabled, hifiButtonDisabled, canBlast);
+        }
+        if ((!isShowingPreviousImages && ((isGif && !isGifLoading) || !isGif)) || (isShowingPreviousImages && !image_data.story_id)) {
+            shareForUrl(id);
+        }
+        if (isShowingPreviousImages && isLoggedIn && image_data.story_id) {
+            updateShareInfo(id, image_data.story_id);
+        }
+    };
+    img.onerror = function () {
+        img.onload = null;
+        img.src = image_data.errorPath;
+    };
 }
 function showConfirmationMessage(selectedID, destination) {
     if (selectedID.id) {
@@ -359,7 +369,7 @@ function showUploadingMessage(selectedID, destination) {
     shareBarHelp.classList.add("uploading");
     shareBarHelp.setAttribute("data-destination", destination);
 }
-function hideUploadingMessageAndShare(selectedID, storyID) {
+function hideUploadingMessageAndMaybeShare(selectedID, storyID) {
     if (selectedID.id) {
         selectedID = selectedID.id; // sometimes (?), `containerID` is passed as an HTML object to these functions; we just want the ID
     }
@@ -382,21 +392,28 @@ function hideUploadingMessageAndShare(selectedID, storyID) {
                 var facebookButton = document.getElementById(selectedID + "facebookButton");
                 window.open(facebookButton.getAttribute("href"), "_blank");
                 shareBarHelp.innerHTML = facebookShareText;
+                // This emitWebEvent() call isn't necessary in the "hifi" and "blast" cases
+                // because the "removeFromStoryIDsToMaybeDelete()" call happens
+                // in snapshot.js when sharing with that method.
+                EventBridge.emitWebEvent(JSON.stringify({
+                    type: "snapshot",
+                    action: "removeFromStoryIDsToMaybeDelete",
+                    story_id: storyID
+                }));
                 break;
             case 'twitter':
                 var twitterButton = document.getElementById(selectedID + "twitterButton");
                 window.open(twitterButton.getAttribute("href"), "_blank");
                 shareBarHelp.innerHTML = twitterShareText;
+                EventBridge.emitWebEvent(JSON.stringify({
+                    type: "snapshot",
+                    action: "removeFromStoryIDsToMaybeDelete",
+                    story_id: storyID
+                }));
                 break;
         }
 
         shareBarHelp.setAttribute("data-destination", "");
-
-        EventBridge.emitWebEvent(JSON.stringify({
-            type: "snapshot",
-            action: "removeFromStoryIDsToMaybeDelete",
-            story_id: storyID
-        }));
     }
 }
 function updateShareInfo(containerID, storyID) {
@@ -417,7 +434,7 @@ function updateShareInfo(containerID, storyID) {
     twitterButton.setAttribute("target", "_blank");
     twitterButton.setAttribute("href", 'https://twitter.com/intent/tweet?text=I%20just%20took%20a%20snapshot!&url=' + shareURL + '&via=highfidelityinc&hashtags=VR,HiFi');
 
-    hideUploadingMessageAndShare(containerID, storyID);
+    hideUploadingMessageAndMaybeShare(containerID, storyID);
 }
 function blastToConnections(selectedID, isGif) {
     if (selectedID.id) {
@@ -552,6 +569,12 @@ function shareButtonClicked(destination, selectedID) {
 
     if (!storyID) {
         showUploadingMessage(selectedID, destination);
+    } else {
+        EventBridge.emitWebEvent(JSON.stringify({
+            type: "snapshot",
+            action: "removeFromStoryIDsToMaybeDelete",
+            story_id: storyID
+        }));
     }
 }
 
@@ -619,9 +642,8 @@ window.onload = function () {
                     // The last element of the message contents list contains a bunch of options,
                     // including whether or not we can share stuff
                     // The other elements of the list contain image paths.
-
-                    if (messageOptions.containsGif) {
-                        if (messageOptions.processingGif) {
+                    if (messageOptions.containsGif === true) {
+                        if (messageOptions.processingGif === true) {
                             imageCount = message.image_data.length + 1; // "+1" for the GIF that'll finish processing soon
                             message.image_data.push({ localPath: messageOptions.loadingGifPath });
                             message.image_data.forEach(function (element, idx) {
@@ -637,6 +659,7 @@ window.onload = function () {
                             shareForUrl("p1");
                             appendShareBar("p1", messageOptions.isLoggedIn, messageOptions.canShare, true, false, false, messageOptions.canBlast);
                             document.getElementById("p1").classList.remove("processingGif");
+                            document.getElementById("snap-button").disabled = false;
                         }
                     } else {
                         imageCount = message.image_data.length;
@@ -649,7 +672,7 @@ window.onload = function () {
                     handleCaptureSetting(message.setting);
                     break;
                 case 'snapshotUploadComplete':
-                    var isGif = message.image_url.split('.').pop().toLowerCase() === "gif";
+                    var isGif = fileExtensionMatches(message.image_url, "gif");
                     updateShareInfo(isGif ? "p1" : "p0", message.story_id);
                     break;
                 default:
@@ -675,6 +698,9 @@ function takeSnapshot() {
         type: "snapshot",
         action: "takeSnapshot"
     }));
+    if (document.getElementById('stillAndGif').checked === true) {
+        document.getElementById("snap-button").disabled = true;
+    }
 }
 
 function testInBrowser(test) {

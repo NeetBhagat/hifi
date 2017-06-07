@@ -32,7 +32,8 @@ public:
     void loadPoses(const AnimPoseVec& poses);
     void computeAbsolutePoses(AnimPoseVec& absolutePoses) const;
 
-    void setTargetVars(const QString& jointName, const QString& positionVar, const QString& rotationVar, const QString& typeVar);
+    void setTargetVars(const QString& jointName, const QString& positionVar, const QString& rotationVar,
+                       const QString& typeVar, const QString& weightVar, float weight, const std::vector<float>& flexCoefficients);
 
     virtual const AnimPoseVec& evaluate(const AnimVariantMap& animVars, const AnimContext& context, float dt, AnimNode::Triggers& triggersOut) override;
     virtual const AnimPoseVec& overlay(const AnimVariantMap& animVars, const AnimContext& context, float dt, Triggers& triggersOut, const AnimPoseVec& underPoses) override;
@@ -57,12 +58,21 @@ public:
 
 protected:
     void computeTargets(const AnimVariantMap& animVars, std::vector<IKTarget>& targets, const AnimPoseVec& underPoses);
-    void solveWithCyclicCoordinateDescent(const std::vector<IKTarget>& targets);
-    int solveTargetWithCCD(const IKTarget& target, AnimPoseVec& absolutePoses);
+    void solveWithCyclicCoordinateDescent(const AnimContext& context, const std::vector<IKTarget>& targets);
+    void solveTargetWithCCD(const AnimContext& context, const IKTarget& target, const AnimPoseVec& absolutePoses, bool debug);
     virtual void setSkeletonInternal(AnimSkeleton::ConstPointer skeleton) override;
+    struct DebugJoint {
+        DebugJoint() : relRot(), constrained(false) {}
+        DebugJoint(const glm::quat& relRotIn, bool constrainedIn) : relRot(relRotIn), constrained(constrainedIn) {}
+        glm::quat relRot;
+        bool constrained;
+    };
+    void debugDrawIKChain(std::map<int, DebugJoint>& debugJointMap, const AnimContext& context) const;
+    void debugDrawRelativePoses(const AnimContext& context) const;
     void debugDrawConstraints(const AnimContext& context) const;
     void initRelativePosesFromSolutionSource(SolutionSource solutionSource, const AnimPoseVec& underPose);
     void blendToPoses(const AnimPoseVec& targetPoses, const AnimPoseVec& underPose, float blendFactor);
+
 
     // for AnimDebugDraw rendering
     virtual const AnimPoseVec& getPosesInternal() const override { return _relativePoses; }
@@ -77,22 +87,20 @@ protected:
     AnimInverseKinematics(const AnimInverseKinematics&) = delete;
     AnimInverseKinematics& operator=(const AnimInverseKinematics&) = delete;
 
+    enum FlexCoefficients { MAX_FLEX_COEFFICIENTS = 10 };
     struct IKTargetVar {
-        IKTargetVar(const QString& jointNameIn,
-                const QString& positionVarIn,
-                const QString& rotationVarIn,
-                const QString& typeVarIn) :
-            positionVar(positionVarIn),
-            rotationVar(rotationVarIn),
-            typeVar(typeVarIn),
-            jointName(jointNameIn),
-            jointIndex(-1)
-        {}
+        IKTargetVar(const QString& jointNameIn, const QString& positionVarIn, const QString& rotationVarIn,
+                    const QString& typeVarIn, const QString& weightVarIn, float weightIn, const std::vector<float>& flexCoefficientsIn);
+        IKTargetVar(const IKTargetVar& orig);
 
+        QString jointName;
         QString positionVar;
         QString rotationVar;
         QString typeVar;
-        QString jointName;
+        QString weightVar;
+        float weight;
+        float flexCoefficients[MAX_FLEX_COEFFICIENTS];
+        size_t numFlexCoefficients;
         int jointIndex; // cached joint index
     };
 
