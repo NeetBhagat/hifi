@@ -636,27 +636,31 @@ void HmdDisplayPlugin::OverlayRenderer::render(HmdDisplayPlugin& plugin) {
 }
 
 void HmdDisplayPlugin::compositePointer() {
-    auto& cursorManager = Cursor::Manager::instance();
-    const auto& cursorData = _cursorsData[cursorManager.getCursor()->getIcon()];
-    auto compositorHelper = DependencyManager::get<CompositorHelper>();
-    // Reconstruct the headpose from the eye poses
-    auto headPosition = vec3(_currentPresentFrameInfo.presentPose[3]);
-    render([&](gpu::Batch& batch) {
-        // FIXME use standard gpu stereo rendering for this.
-        batch.enableStereo(false);
-        batch.setFramebuffer(_compositeFramebuffer);
-        batch.setPipeline(_cursorPipeline);
-        batch.setResourceTexture(0, cursorData.texture);
-        batch.resetViewTransform();
-        for_each_eye([&](Eye eye) {
-            batch.setViewportTransform(eyeViewport(eye));
-            batch.setProjectionTransform(_eyeProjections[eye]);
-            auto eyePose = _currentPresentFrameInfo.presentPose * getEyeToHeadTransform(eye);
-            auto reticleTransform = compositorHelper->getReticleTransform(eyePose, headPosition);
-            batch.setModelTransform(reticleTransform);
-            batch.draw(gpu::TRIANGLE_STRIP, 4);
+    // if useSystemMouse return "true", then it will will simply move the system mouse.
+    // Else it will move reticle position as a custom application specific position.
+    if (!useSystemMouse()) {
+        auto& cursorManager = Cursor::Manager::instance();
+        const auto& cursorData = _cursorsData[cursorManager.getCursor()->getIcon()];
+        auto compositorHelper = DependencyManager::get<CompositorHelper>();
+        // Reconstruct the headpose from the eye poses
+        auto headPosition = vec3(_currentPresentFrameInfo.presentPose[3]);
+        render([&](gpu::Batch& batch) {
+            // FIXME use standard gpu stereo rendering for this.
+            batch.enableStereo(false);
+            batch.setFramebuffer(_compositeFramebuffer);
+            batch.setPipeline(_cursorPipeline);
+            batch.setResourceTexture(0, cursorData.texture);
+            batch.resetViewTransform();
+            for_each_eye([&](Eye eye) {
+                batch.setViewportTransform(eyeViewport(eye));
+                batch.setProjectionTransform(_eyeProjections[eye]);
+                auto eyePose = _currentPresentFrameInfo.presentPose * getEyeToHeadTransform(eye);
+                auto reticleTransform = compositorHelper->getReticleTransform(eyePose, headPosition);
+                batch.setModelTransform(reticleTransform);
+                batch.draw(gpu::TRIANGLE_STRIP, 4);
+            });
         });
-    });
+    }
 }
 
 void HmdDisplayPlugin::compositeOverlay() {

@@ -2047,9 +2047,7 @@ void Application::initializeUi() {
 
     auto compositorHelper = DependencyManager::get<CompositorHelper>();
     connect(compositorHelper.data(), &CompositorHelper::allowMouseCaptureChanged, [=] {
-        if (isHMDMode()) {
-            showCursor(compositorHelper->getAllowMouseCapture() ? Qt::BlankCursor : Qt::ArrowCursor);
-        }
+        showCursor(getActiveDisplayPlugin()->useSystemMouse() ? Qt::ArrowCursor : Qt::BlankCursor);
     });
 
     // Pre-create a couple of Web3D overlays to speed up tablet UI
@@ -3271,11 +3269,10 @@ void Application::mouseMoveEvent(QMouseEvent* event) {
 }
 
 void Application::mousePressEvent(QMouseEvent* event) {
-	//Do not allow mouse press event anywhere on screen in HMD/VR mode
-	//Allow only in Desktop mode
-	if (isHMDMode()){
-		return;
-	}
+    // Prevent mouse press event on interface window when HMD/VR mode is ON
+    if (isHMDMode() && getActiveDisplayPlugin()->useSystemMouse()) {
+        return;
+    }
     // Inhibit the menu if the user is using alt-mouse dragging
     _altPressed = false;
 
@@ -3322,11 +3319,10 @@ void Application::mousePressEvent(QMouseEvent* event) {
 }
 
 void Application::mouseDoublePressEvent(QMouseEvent* event) {
-	//Do not allow mouse press event anywhere on screen in HMD/VR mode
-	//Allow only in Desktop mode
-	if (isHMDMode()){
-		return;
-	}
+    // Prevent mouse double press event on interface window when HMD/VR mode is ON
+    if (isHMDMode() && getActiveDisplayPlugin()->useSystemMouse()) {
+        return;
+    }
     auto offscreenUi = DependencyManager::get<OffscreenUi>();
     auto eventPosition = getApplicationCompositor().getMouseEventPosition(event);
     QPointF transformedPos = offscreenUi->mapToVirtualScreen(eventPosition, _glWidget);

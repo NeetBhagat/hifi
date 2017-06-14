@@ -772,11 +772,6 @@ var mousePressStartPosition = {
 var mouseDown = false;
 
 function mousePressEvent(event) {
-    //Do not allow mouse press event anywhere on screen in HMD/VR mode
-    //Allow only in Desktop mode
-    if (HMD.active) {
-        return;
-    }
     mouseDown = true;
     mousePressStartPosition = {
         x: event.x,
@@ -874,11 +869,6 @@ function wasTabletClicked(event) {
 }
 
 function mouseClickEvent(event) {
-    //Do not allow mouse press event anywhere on screen in HMD/VR mode
-    //Allow only in Desktop mode
-    if (HMD.active) {
-        return;
-    }
     var wantDebug = false;
     var result, properties, tabletClicked;
     if (isActive && event.isLeftButton) {

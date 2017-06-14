@@ -212,7 +212,12 @@ public:
     virtual void cycleDebugOutput() {}
 
     static const QString& MENU_PATH();
-
+    
+    // Use system mouse in all modes, so the reticle position will simply move the system mouse.
+    // if any plugin needs to control/move the reticle position as a custom application specific position,
+    // Override return value as "false" in specific plugin class [For ex- HMDDisplayPlugin for HMD].
+    // In desktop & HMD mode, the reticle position will simply move the system mouse.
+    virtual bool useSystemMouse() const { return true; }
 
 signals:
     void recommendedFramebufferSizeChanged(const QSize& size);

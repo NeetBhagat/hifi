@@ -45,6 +45,7 @@ public:
     }
 
     float stutterRate() const override;
+    bool useSystemMouse() const override { return true; }
 
 protected:
     virtual void hmdPresent() = 0;

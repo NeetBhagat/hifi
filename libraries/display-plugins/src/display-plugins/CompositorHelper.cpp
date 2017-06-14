@@ -186,7 +186,7 @@ void CompositorHelper::setAllowMouseCapture(bool capture) {
 }
 
 void CompositorHelper::handleLeaveEvent() {
-    if (shouldCaptureMouse()) {
+    if (shouldCaptureMouse() && !_currentDisplayPlugin->useSystemMouse()) {
         
         //QWidget* mainWidget = (QWidget*)qApp->getWindow();
         static QWidget* mainWidget = nullptr;
@@ -242,9 +242,11 @@ bool CompositorHelper::handleRealMouseMoveEvent(bool sendFakeEvent) {
         auto newPosition = QCursor::pos();
         auto changeInRealMouse = newPosition - _lastKnownRealMouse;
         auto newReticlePosition = _reticlePositionInHMD + toGlm(changeInRealMouse);
-        setReticlePosition(newReticlePosition, sendFakeEvent);
+        if (!_currentDisplayPlugin->useSystemMouse()) {
+            setReticlePosition(newReticlePosition, sendFakeEvent);
+            QCursor::setPos(QPoint(_lastKnownRealMouse.x(), _lastKnownRealMouse.y())); // move cursor back to where it was
+        }
         _ignoreMouseMove = true;
-        QCursor::setPos(QPoint(_lastKnownRealMouse.x(), _lastKnownRealMouse.y())); // move cursor back to where it was
         return true;  // swallow the event
     } else {
         _lastKnownRealMouse = QCursor::pos();
