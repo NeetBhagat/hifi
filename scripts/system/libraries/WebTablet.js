@@ -512,8 +512,21 @@ WebTablet.prototype.mousePressEvent = function (event) {
     if (entityPickResults.intersects && (entityPickResults.entityID === this.tabletEntityID ||
                                          entityPickResults.overlayID === this.tabletEntityID)) {
         var overlayPickResults = Overlays.findRayIntersection(pickRay, true, [this.webOverlayID, this.homeButtonID], []);
+        var isTabletScreenChanged = false;
         if (overlayPickResults.intersects && overlayPickResults.overlayID === this.homeButtonID) {
-            var tablet = Tablet.getTablet("com.highfidelity.interface.tablet.system");
+            // This will allow to go back to main app menu or close the tablet.
+            isTabletScreenChanged = true;
+        } else if (!HMD.active && (!overlayPickResults.intersects || overlayPickResults.overlayID !== this.webOverlayID)) {
+            this.dragging = true;
+            var invCameraXform = new Xform(Camera.orientation, Camera.position).inv();
+            this.initialLocalIntersectionPoint = invCameraXform.xformPoint(entityPickResults.intersection);
+            this.initialLocalPosition = Overlays.getProperty(this.tabletEntityID, "localPosition");
+        } else if (HMD.active && !overlayPickResults.intersects) {
+            //During help screen shown and when press "X" button then it go back to main menu screen or close the tablet.
+            isTabletScreenChanged = true;
+        }
+        var tablet = Tablet.getTablet("com.highfidelity.interface.tablet.system");
+        if (isTabletScreenChanged) {
             var onHomeScreen = tablet.onHomeScreen();
             var isMessageOpen = tablet.isMessageDialogOpen();
             if (onHomeScreen) {
@@ -526,11 +539,6 @@ WebTablet.prototype.mousePressEvent = function (event) {
                     this.setHomeButtonTexture();
                 }
             }
-        } else if (!HMD.active && (!overlayPickResults.intersects || overlayPickResults.overlayID !== this.webOverlayID)) {
-            this.dragging = true;
-            var invCameraXform = new Xform(Camera.orientation, Camera.position).inv();
-            this.initialLocalIntersectionPoint = invCameraXform.xformPoint(entityPickResults.intersection);
-            this.initialLocalPosition = Overlays.getProperty(this.tabletEntityID, "localPosition");
         }
     }
 };
